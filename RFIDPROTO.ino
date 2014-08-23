@@ -1,12 +1,11 @@
-// Sweep
-// by BARRAGAN <http://barraganstudio.com>
-// This example code is in the public domain.
-
-
 #include <Servo.h>
 
 #define TRUE  1
 #define FALSE 0
+
+#define LOCKED 90
+#define ORIGIN 0
+#define UNLOCKED -90
 
 Servo lockservo;  // create servo object to control a servo
                 // a maximum of eight servo objects can be created
@@ -15,6 +14,7 @@ int pos = 0;    // variable to store the servo position
 int rfidInPin = 7;
 int doorLimit = 5;
 int toggleButton = 3;
+int ledPin = 11;
 
 
 void toggle(boolean * value);
@@ -27,14 +27,16 @@ int val = 0;
 boolean lockState = false;
 boolean inoutState = false;
 
-boolean doorClosed = false;
+boolean doorState = false;
+boolean doorStateLast = false;
+
 boolean modeButton = false;
 boolean modeButtonLast = false;
 
 boolean rfidIn   = false;
 
-
-
+boolean beenLocked = false;
+boolean beenUnlocked = false;
 
 void setup()
 {
@@ -42,16 +44,16 @@ void setup()
   pinMode(rfidInPin, INPUT_PULLUP);
   pinMode(toggleButton, INPUT_PULLUP);
   pinMode(doorLimit, INPUT_PULLUP);
-
+  pinMode(ledPin, OUTPUT);
   Serial.begin(9600);
 }
  
  
 void loop()
 {
-    doorClosed = digitalRead(doorLimit);
+    doorState = !digitalRead(doorLimit);
     modeButton = !digitalRead(toggleButton);
-    rfidIn     = digitalRead(rfidInPin);
+    rfidIn     = !digitalRead(rfidInPin);
 
     /* Toggle IN or OUT modes */
     if(modeButton == true && modeButtonLast == false )
@@ -67,27 +69,68 @@ void loop()
         }
     }
 
-    modeButtonLast = modeButton;
+    
+    /* Set status LED */
+    if(inoutState == true)  
+        digitalWrite(ledPin, HIGH);
+    else
+        digitalWrite(ledPin, LOW);
 
+
+    /* FSM STUFF */
     if( inoutState == true )
-    {
+    {   
+        lockservo.write(ORIGIN);
+
+        if(lockState == true)
+        {
+            lockservo.write(UNLOCKED);
+            lockservo.write(ORIGIN);
+        }
         //If you're inside the room
     }
 
 
     //OUT
     else
-    {
-        //if()
+    {   
+        /* If the door goes from open to closed */
+        if( doorState == true && doorStateLast == false)
+        {   
+            if(lockState == false)
+            {
+                Serial.write(">>>Locking deadbolt\n");
+                lockservo.write(LOCKED);
+                lockState = true;
+            }
+        }
+
+        // if( doorState == true && doorStateLast == false)
+        // {
+        //     Serial.write(">>>Locking deadbolt!\n");
+        // }
+
+        if( rfidIn == true)
+        {
+            if(lockState == true)
+            {
+                Serial.write(">>>Unlocking deadbolt\n");
+                lockservo.write(UNLOCKED);
+                lockservo.write(ORIGIN);
+                lockState == false;
+            }
+        }
+
+        lockservo.write(ORIGIN);
         //If you want the door to be locked
     }
 
 
 
 
-
+    modeButtonLast = modeButton;
+    doorStateLast = doorState;
     //buttonPressed = digitalRead(buttonPin);
-
 
     //lastButtonState = buttonPressed;
     
